@@ -15,11 +15,6 @@ public class RealTimeService {
     private final FirebaseDatabase database= FirebaseDatabase.getInstance();
     private final DatabaseReference databaseReference= database.getReference("data");
 
-    public void updateWaitingLine(List<WaitingTurnDto> turnList) {
-        for (WaitingTurnDto waitingTurnDto : turnList) {
-            update(waitingTurnDto.reservationId, waitingTurnDto.getTurnNumber());
-        }
-    }
     public void addWaitingLine(WaitingTurnDto turnDto) {
         update(turnDto.reservationId, turnDto.getTurnNumber());
     }
@@ -46,12 +41,12 @@ public class RealTimeService {
         });
     }
     //  데이터 중 특정 필드만 업데이트하는 메서드
-    public void update(String userId, String newData) {
-        DatabaseReference userRef = databaseReference.child(userId);
+    public void update(String reservationId, String newData) {
+        DatabaseReference userRef = databaseReference.child(reservationId);
 
         // 업데이트할 데이터 설정
         Map<String, Object> updates = new HashMap<>();
-        updates.put("id", userId);
+        updates.put("id", reservationId);
         updates.put("data", newData);
 
 
@@ -61,6 +56,18 @@ public class RealTimeService {
                 System.out.println("Failed to update data: " + error.getMessage());
             } else {
                 System.out.println("User data updated successfully");
+            }
+        });
+    }
+
+    public void delete(String reservationId){
+        DatabaseReference userRef = databaseReference.child(reservationId);
+
+        userRef.removeValue((error, ref) -> {
+            if(error != null){
+                System.out.println("Failed to delete data: " + error.getMessage());
+            }else{
+                System.out.println("User data deleted successfully");
             }
         });
     }

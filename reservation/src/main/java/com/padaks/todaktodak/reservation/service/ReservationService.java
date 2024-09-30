@@ -1,5 +1,8 @@
 package com.padaks.todaktodak.reservation.service;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -12,6 +15,8 @@ import com.padaks.todaktodak.reservation.domain.Reservation;
 import com.padaks.todaktodak.reservation.dto.*;
 import com.padaks.todaktodak.reservation.domain.ReservationHistory;
 import com.padaks.todaktodak.reservation.domain.Status;
+import com.padaks.todaktodak.reservation.realtime.RealTimeService;
+import com.padaks.todaktodak.reservation.realtime.WaitingTurnDto;
 import com.padaks.todaktodak.reservation.repository.ReservationHistoryRepository;
 import com.padaks.todaktodak.reservation.repository.ReservationRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,8 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.padaks.todaktodak.common.exception.exceptionType.HospitalExceptionType.*;
@@ -45,12 +49,14 @@ public class ReservationService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final HospitalRepository hospitalRepository;
+    private final RealTimeService realTimeService;
 
     private static final String RESERVATION_LIST_KEY = "doctor_";
     private final MemberFeign memberFeign;
     private final UntactChatRoomService untactChatRoomService;
+    private final ObjectMapper objectMapper;
 
-//    진료 스케줄 예약 기능
+    //    진료 스케줄 예약 기능
     public void scheduleReservation(ReservationSaveReqDto dto){
         log.info("ReservationService[scheduleReservation] : 스케줄 예약 요청 처리 시작");
         List<LocalTime> timeSlots = ReservationTimeSlot.timeSlots();
@@ -120,6 +126,13 @@ public class ReservationService {
         RedisDto redisDto = dtoMapper.toRedisDto(reservation);
 //        list 에서 해당 예약을 삭제
         redisTemplate.opsForZSet().remove(key, redisDto);
+        realTimeService.delete(redisDto.getId().toString());
+        Set<Object> sets = redisTemplate.opsForZSet().range(key, 0, -1);
+        for(Object obj : sets){
+            Map<String , Object> map = (Map<String, Object>) obj;
+            Long lank = redisTemplate.opsForZSet().rank(key, obj);
+            realTimeService.update(map.get("id").toString(), lank.toString());
+        }
     }
     
 //    예약 조회 기능

@@ -23,9 +23,4 @@ public class RealTimeController {
         log.info("read");
         realTimeService.readDataOnce(id);
     }
-    // 테스트를 위한 api
-    @PostMapping("/updateTurn")
-    public void updateTurn(@RequestBody List<WaitingTurnDto> dto){
-        realTimeService.updateWaitingLine(dto);
-    }
 }
