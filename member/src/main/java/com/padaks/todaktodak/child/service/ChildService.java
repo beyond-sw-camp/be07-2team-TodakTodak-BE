@@ -149,7 +149,7 @@ public class ChildService {
         messageData.put("memberEmail", shared.getMemberEmail()); // 받는 사람 = 자녀 공유 받는 사람
         messageData.put("childId", child.getId());
         messageData.put("childName", child.getName());
-        messageData.put("sharer", sharer.getName());
+        messageData.put("sharer", sharer.getName()); //공유자
 
 
         // 객체를 JSON 문자열로 변환

@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import javax.persistence.EntityNotFoundException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 @RequiredArgsConstructor
@@ -27,7 +29,7 @@ public class FcmService {
         member.updateFcmToken(dto.getFcmToken());
     }
 
-    public void sendMessage(Long memberId, String title, String body, Type type){
+    public void sendMessage(Long memberId, String title, String body, Type type, Long id){
         Member member = memberRepository.findByIdOrThrow(memberId);
 
         String token = member.getFcmToken();
@@ -42,17 +44,22 @@ public class FcmService {
                 .content(title +"\n"+ body)  //알림 내용 저장
                 .isRead(false)      //notification 생성될때 = false -> 사용자가 알림 누르는 순간 true로 바껴야함
                 .type(type)
-                .refId(null)        //등록된 post의 Id
+                .refId(id)        //등록된 post의 Id
                 .build();
 
         //db에 Notification 저장
         notificationRepository.save(notification);
+        //알림 눌렀을 때 해당 페이지로 이동하도록 type, id 저장
+        Map<String, String> data = new HashMap<>();
+        data.put("type", type.name());
+        data.put("refId", String.valueOf(notification.getId()));
 
         Message message = Message.builder()
                 .setWebpushConfig(WebpushConfig.builder()
                         .setNotification(WebpushNotification.builder()
                                 .setTitle(title)
                                 .setBody(body)
+                                .setData(data)
                                 .build())
                         .build())
                 .setToken(token)
@@ -72,4 +79,5 @@ public class FcmService {
         }
 
     }
+
 }

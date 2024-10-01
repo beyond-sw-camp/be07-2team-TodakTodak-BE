@@ -1,6 +1,7 @@
 package com.padaks.todaktodak.notification.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.padaks.todaktodak.common.dto.DtoMapper;
@@ -10,17 +11,21 @@ import com.padaks.todaktodak.member.repository.MemberRepository;
 import com.padaks.todaktodak.member.service.FcmService;
 import com.padaks.todaktodak.notification.domain.Notification;
 import com.padaks.todaktodak.notification.domain.Type;
-import com.padaks.todaktodak.notification.dto.CommentSuccessDto;
+import com.padaks.todaktodak.notification.dto.*;
 import com.padaks.todaktodak.notification.repository.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 
 import javax.persistence.EntityNotFoundException;
+import java.math.BigDecimal;
+import java.sql.Struct;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -30,38 +35,194 @@ public class NotificationKafkaConsumer {
     private final RedisTemplate<String, Object> redisTemplate;
     private final MemberRepository memberRepository;
     private final FcmService fcmService;
+    private final ObjectMapper objectMapper;
 
+    //자녀 등록 알림
+    @KafkaListener(topics = "child-share", groupId = "group_id", containerFactory = "kafkaListenerContainerFactory")
+    public void registerNotification(String message) throws JsonProcessingException {
+        // JSON 문자열을 Map으로 변환
+        Map<String, Object> messageData = objectMapper.readValue(message,new TypeReference<Map<String, Object>>() {} );
+        System.out.println("Received Payment Success message: " + messageData);
 
+        // 수신한 데이터를 처리하는 로직 추가
+        String memberEmail = (String) messageData.get("memberEmail");
+        Long childId = (Long) messageData.get("childId");
+        String name = (String) messageData.get("childName");
+        String sharer = (String) messageData.get("sharer");
 
+        //형식 확인용
+        System.out.println("수신 Email: " + memberEmail + ", childId: " + childId + " child name: " + name + " 공유자 이름 : " + sharer);
+
+        Member reciever = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
+        fcmService.sendMessage(reciever.getId(), "자녀 등록 알림",sharer+"사용자가 자녀 "+name+"를 등록하였습니다.",Type.REGISTER, childId);
+    }
+
+    // 커뮤니티 알림
     @KafkaListener(topics = "community-success", groupId = "group_id", containerFactory = "kafkaListenerContainerFactory")
-    public void consumerNotification(String message){
-        ObjectMapper objectMapper = new ObjectMapper();
-        if (message.startsWith("\"") && message.endsWith("\"")) {
-            message = message.substring(1, message.length() -1).replace("\"", "\"");
-            message = message.replace("\\", "");
-        }
+    public void consumerNotification(String message) throws JsonProcessingException{
+        Map<String, Object> messageData = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
+        System.out.println("Received Payment Success message: " + messageData);
 
-        try {
-            CommentSuccessDto dto = objectMapper.readValue(message, CommentSuccessDto.class);
-            Member member = memberRepository.findByMemberEmail(dto.getReceiverEmail()).orElseThrow(()->new EntityNotFoundException("존재하지 않는 회원입니다."));
+        String memberEmail = (String) messageData.get("receiverEmail");
+        Long postId = (Long) messageData.get("postId");
+        String title = (String) messageData.get("title");
+        Type type = (Type) messageData.get("type");
 
-            String category = "";
-            if (dto.getType().equals(Type.POST)){
-                category = "질문 알림";
-                fcmService.sendMessage(member.getId(), category, dto.getTitle()+"에 대한 답변이 작성되었습니다.",  Type.POST);
+        Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
 
-            }else if (dto.getType().equals(Type.COMMENT)){
-                category = "답변 알림";
-                String comment = "에 작성한 답변";
-                fcmService.sendMessage(member.getId(), category, dto.getTitle()+comment+"에 대한 답변이 작성되었습니다.",  Type.COMMENT);
+        String category = "";
+        if (type.equals(Type.POST)){
+            category = "질문 알림";
+            fcmService.sendMessage(member.getId(), category, "질문 :" +title+ "에 대한 답변이 작성되었습니다.",  Type.POST,postId);
 
-            }
+        }else if (type.equals(Type.COMMENT)){
+            category = "답변 알림";
+            String comment = "에 작성한 답변";
+            fcmService.sendMessage(member.getId(), category, "질문 :" +title+comment+"에 대한 답변이 작성되었습니다.",  Type.COMMENT, postId);
 
-
-        } catch (JsonMappingException e) {
-            throw new RuntimeException(e);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
         }
     }
+
+    //좋아요 알림
+
+    // 결제 알림
+    @KafkaListener(topics = "payment-success", groupId = "payment-group", containerFactory = "payKafkaListenerContainerFactory")
+    public void listenPaymentSuccess(String message, Acknowledgment acknowledgment) throws JsonProcessingException {
+        try {
+            // JSON 문자열을 Map으로 변환
+            Map<String, Object> messageData = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
+            System.out.println("Received Payment Success message: " + messageData);
+
+            // 수신한 데이터를 처리하는 로직 추가
+            String memberEmail = (String) messageData.get("memberEmail");
+            Integer fee = (Integer) messageData.get("fee");
+            String name = (String) messageData.get("name");
+            String hospitalAdminEmail = (String) messageData.get("hospitalAdmin");
+
+            System.out.println("Email: " + memberEmail + ", Fee: " + fee + ", Name: " + name);
+
+//            PaymentSuccessDto paymentSuccessDto = objectMapper.readValue(message, PaymentSuccessDto.class);
+//            System.out.println("Received Payment Success DTO: " + paymentSuccessDto);
+
+            Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
+            Member hospitalAdmin = memberRepository.findByMemberEmail(hospitalAdminEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 병원 admin입니다."));
+            // 메시지 처리 후 수동 오프셋 커밋
+            //병원에서 정기 결제 했을 때 admin에게 가는 알림
+//            fcmService.sendMessage(adminId, "회원 : " + name + " 결제 성공 알림", memberEmail+"님께서 "+fee+"원 결제하였습니다.", Type.PAYMENT_SUCCESS, );
+            //병원에 메세지 전송
+            fcmService.sendMessage(hospitalAdmin.getId(), "회원 : " + name + " 결제 성공 알림", memberEmail+"님께서 "+fee+"원 결제하였습니다.", Type.PAYMENT_SUCCESS, null);
+
+            //결제자에게 메세지 전송
+            fcmService.sendMessage(member.getId(), "회원 : " + name + " 결제 성공 알림", memberEmail+"님께서 "+fee+"원 결제하였습니다.", Type.PAYMENT_SUCCESS, null);
+
+            acknowledgment.acknowledge();
+        } catch (Exception e) {
+            System.err.println("Error processing payment success message: " + e.getMessage());
+        }
+    }
+
+
+    @KafkaListener(topics = "payment-fail", groupId = "payment-group", containerFactory = "payKafkaListenerContainerFactory")
+    public void listenPaymentFail(String message, Acknowledgment acknowledgment) throws JsonProcessingException {
+
+//        PaymentFailDto paymentFailDto = objectMapper.readValue(message, PaymentFailDto.class);
+//        System.out.println("Received Payment Fail DTO: " + paymentFailDto);
+//        String memberEmail = paymentFailDto.getMemberEmail();
+//        BigDecimal fee = paymentFailDto.getFee();
+        Map<String, Object> messageData = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
+        System.out.println("Received Payment fail message: " + messageData);
+
+        // 수신한 데이터를 처리하는 로직 추가
+        String memberEmail = (String) messageData.get("memberEmail");
+        Integer fee = (Integer) messageData.get("fee");
+        String name = (String) messageData.get("name");
+
+        System.out.println("Email: " + memberEmail + ", Fee: " + fee + ", Name: " + name);
+        Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
+
+        // 결제 실패 후 알림을 보낼 로직
+        // 정기 결제 실패
+        Long adminId = 1L;
+        fcmService.sendMessage(adminId, "결제 실패 알림", "회원 : " +memberEmail+"님의 "+fee+"원 결제가 실패하였습니다.", Type.PAYMENT_FAIL, null);
+
+        //결제자에게 메세지 전송
+        fcmService.sendMessage(member.getId(), "회원 : " + name + " 결제 실패 알림", memberEmail+"님의 "+fee+"원 결제가 실패하였습니다..", Type.PAYMENT_FAIL, null);
+
+
+        // 오프셋 변경
+        acknowledgment.acknowledge();
+    }
+
+    @KafkaListener(topics = "payment-cancel", groupId = "payment-group", containerFactory = "payKafkaListenerContainerFactory")
+    public void listenPaymentCancel(String message, Acknowledgment acknowledgment) throws JsonProcessingException {
+
+//        PaymentCancelDto paymentCancelDto = objectMapper.readValue(message, PaymentCancelDto.class);
+//        System.out.println("Received Payment Cancel DTO: " + paymentCancelDto);
+//        // 결제 취소 후 알림을 보낼 로직
+//        String memberEmail = paymentCancelDto.getMemberEmail();
+//        BigDecimal fee = paymentCancelDto.getFee();
+//        String name = paymentCancelDto.getName();
+        Map<String, Object> messageData = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
+        System.out.println("Received Payment cancel message: " + messageData);
+
+        // 수신한 데이터를 처리하는 로직 추가
+        String memberEmail = (String) messageData.get("memberEmail");
+        Integer fee = (Integer) messageData.get("fee");
+        String name = (String) messageData.get("name");
+        String hospitalAdminEmail = (String) messageData.get("hospitalAdmin");
+
+        System.out.println("Email: " + memberEmail + ", Fee: " + fee + ", Name: " + name);
+        Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
+        Member hospitalAdmin = memberRepository.findByMemberEmail(hospitalAdminEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 병원 admin입니다."));
+        //파닥 admin 에게 전송
+        Long adminId = 1L;
+        fcmService.sendMessage(adminId, " 결제 취소 성공 알림", memberEmail+"님의 "+fee+"원 결제가 취소되었습니다.", Type.PAYMENT_CANCEL, null);
+
+        //병원에 메세지 전송
+        fcmService.sendMessage(hospitalAdmin.getId(), "회원 : " + name + " 결제 취소 알림", memberEmail+"님의 "+fee+"원 결제가 취소되었습니다.", Type.PAYMENT_CANCEL, null);
+
+        //결제자에게 메세지 전송
+        fcmService.sendMessage(member.getId(), "회원 : " + name + " 결제 취소 알림", memberEmail+"님의 "+fee+"원 결제가 취소되었습니다.", Type.PAYMENT_CANCEL, null);
+
+
+
+        // 오프셋 변경
+        acknowledgment.acknowledge();
+    }
+
+    @KafkaListener(topics = "payment-cancel-fail", groupId = "payment-group", containerFactory = "payKafkaListenerContainerFactory")
+    public void listenPaymentCancelFail(String message, Acknowledgment acknowledgment) throws JsonProcessingException {
+//        System.out.println("Received Payment cancel fail message: " + message);
+//
+//        PaymentCancelFailDto paymentCancelFailDto = objectMapper.readValue(message, PaymentCancelFailDto.class);
+//        System.out.println("Received Payment Cancel Fail DTO: " + paymentCancelFailDto);
+//        // 결제 취소 후 알림을 보낼 로직
+//        String memberEmail = paymentCancelFailDto.getMemberEmail();
+//        BigDecimal fee = paymentCancelFailDto.getFee();
+        Map<String, Object> messageData = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
+        System.out.println("Received Payment cancel fail message: " + messageData);
+
+        // 수신한 데이터를 처리하는 로직 추가
+        String memberEmail = (String) messageData.get("memberEmail");
+        Integer fee = (Integer) messageData.get("fee");
+        String name = (String) messageData.get("name");
+
+        System.out.println("Email: " + memberEmail + ", Fee: " + fee + ", Name: " + name);
+        Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
+
+        //결제 취소 실패 admin 알림
+        Long adminId = 1L;
+        fcmService.sendMessage(adminId, "결제 취소 실패 알림", memberEmail+"님의 "+fee+"원 결제 취소가 실패하였습니다.", Type.PAYMENT_CANCEL_FAIL, null);
+
+        //결제자에게 메세지 전송
+        fcmService.sendMessage(member.getId(), "회원 : " + name + " 결제 취소 실패 알림", memberEmail+"님의 "+fee+"원 결제취소가 실패되었습니다.", Type.PAYMENT_CANCEL_FAIL, null);
+
+
+        // 오프셋 변경
+        acknowledgment.acknowledge();
+    }
+
+    //
 }
+
+

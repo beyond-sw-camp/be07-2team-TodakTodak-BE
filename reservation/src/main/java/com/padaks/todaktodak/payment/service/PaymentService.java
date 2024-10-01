@@ -141,12 +141,14 @@ public class PaymentService {
             // 저장 로직
             paymentRepository.save(pay);
             String memberEmail = pay.getMemberEmail();
+            String hospitalAdmin = pay.getMedicalChart().getReservation().getHospital().getAdminEmail();
 
             // 메시지 데이터 객체 생성
             Map<String, Object> messageData = new HashMap<>();
             messageData.put("memberEmail", memberEmail);
             messageData.put("fee", fee);
             messageData.put("name", name);
+            messageData.put("hospitalAdmin", hospitalAdmin);
 
             // 객체를 JSON 문자열로 변환
             String message = objectMapper.writeValueAsString(messageData);
@@ -176,7 +178,6 @@ public class PaymentService {
             log.error("결제 처리 중 오류 발생: ", e);
 
             String memberEmail = member.getMemberEmail();
-
             // 메시지 데이터 객체 생성
             Map<String, Object> messageData = new HashMap<>();
             messageData.put("memberEmail", memberEmail);
@@ -248,7 +249,7 @@ public class PaymentService {
 
             // 저장 로직
             paymentRepository.save(pay);
-
+            String hospitalAdmin = pay.getMedicalChart().getReservation().getHospital().getAdminEmail();
             String memberEmail = pay.getMemberEmail();
             BigDecimal fee = pay.getAmount();
 
@@ -257,6 +258,7 @@ public class PaymentService {
             messageData.put("memberEmail", memberEmail);
             messageData.put("fee", fee);
             messageData.put("name", name);
+            messageData.put("hospitalAdmin", hospitalAdmin);
 
             // 객체를 JSON 문자열로 변환
             String message = objectMapper.writeValueAsString(messageData);
