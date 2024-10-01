@@ -42,9 +42,9 @@ public class FcmController {
     }
 
     @PostMapping("/send")
-    public ResponseEntity<?> sendNotification(@RequestBody Long myId, @RequestBody String title, String body, Type type){
+    public ResponseEntity<?> sendNotification(@RequestBody Long myId, @RequestBody String title, String body, Type type, Long id){
         try {
-            fcmService.sendMessage(myId, title, body, type);
+            fcmService.sendMessage(myId, title, body, type, id);
             CommonResDto commonResDto = new CommonResDto(HttpStatus.OK, "fcm 메세지 전송 성공", type);
             return new ResponseEntity<>(commonResDto, HttpStatus.OK);
         }catch (Exception e){

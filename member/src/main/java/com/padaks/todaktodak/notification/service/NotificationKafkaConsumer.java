@@ -61,7 +61,7 @@ public class NotificationKafkaConsumer {
     @KafkaListener(topics = "community-success", groupId = "group_id", containerFactory = "kafkaListenerContainerFactory")
     public void consumerNotification(String message) throws JsonProcessingException{
         Map<String, Object> messageData = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
-        System.out.println("Received Payment Success message: " + messageData);
+        System.out.println("Received community Success message: " + messageData);
 
         String memberEmail = (String) messageData.get("receiverEmail");
         Long postId = (Long) messageData.get("postId");
@@ -108,8 +108,9 @@ public class NotificationKafkaConsumer {
             Member hospitalAdmin = memberRepository.findByMemberEmail(hospitalAdminEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 병원 admin입니다."));
             // 메시지 처리 후 수동 오프셋 커밋
             //병원에서 정기 결제 했을 때 admin에게 가는 알림
-//            fcmService.sendMessage(adminId, "회원 : " + name + " 결제 성공 알림", memberEmail+"님께서 "+fee+"원 결제하였습니다.", Type.PAYMENT_SUCCESS, );
-            //병원에 메세지 전송
+            Long adminId = 1L;
+            fcmService.sendMessage(adminId, "회원 : " + name + " 결제 성공 알림", memberEmail+"님께서 "+fee+"원 결제하였습니다.", Type.PAYMENT_SUCCESS, null);
+
             fcmService.sendMessage(hospitalAdmin.getId(), "회원 : " + name + " 결제 성공 알림", memberEmail+"님께서 "+fee+"원 결제하였습니다.", Type.PAYMENT_SUCCESS, null);
 
             //결제자에게 메세지 전송
@@ -136,14 +137,18 @@ public class NotificationKafkaConsumer {
         String memberEmail = (String) messageData.get("memberEmail");
         Integer fee = (Integer) messageData.get("fee");
         String name = (String) messageData.get("name");
+        String hospitalAdmin = (String)messageData.get("hospitalAdmin");
 
         System.out.println("Email: " + memberEmail + ", Fee: " + fee + ", Name: " + name);
         Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
-
+        Member hospital = memberRepository.findByMemberEmail(hospitalAdmin).orElseThrow(()->new EntityNotFoundException("존재하지 않는 병원 관리자입니다."));
         // 결제 실패 후 알림을 보낼 로직
         // 정기 결제 실패
         Long adminId = 1L;
         fcmService.sendMessage(adminId, "결제 실패 알림", "회원 : " +memberEmail+"님의 "+fee+"원 결제가 실패하였습니다.", Type.PAYMENT_FAIL, null);
+
+        //병원 admin 메세지 전송
+        fcmService.sendMessage(hospital.getId(), "회원 : " + name + " 결제 실패 알림", memberEmail+"님의 "+fee+"원 결제가 실패하였습니다..", Type.PAYMENT_FAIL, null);
 
         //결제자에게 메세지 전송
         fcmService.sendMessage(member.getId(), "회원 : " + name + " 결제 실패 알림", memberEmail+"님의 "+fee+"원 결제가 실패하였습니다..", Type.PAYMENT_FAIL, null);
@@ -174,6 +179,7 @@ public class NotificationKafkaConsumer {
         System.out.println("Email: " + memberEmail + ", Fee: " + fee + ", Name: " + name);
         Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
         Member hospitalAdmin = memberRepository.findByMemberEmail(hospitalAdminEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 병원 admin입니다."));
+
         //파닥 admin 에게 전송
         Long adminId = 1L;
         fcmService.sendMessage(adminId, " 결제 취소 성공 알림", memberEmail+"님의 "+fee+"원 결제가 취소되었습니다.", Type.PAYMENT_CANCEL, null);
@@ -206,23 +212,26 @@ public class NotificationKafkaConsumer {
         String memberEmail = (String) messageData.get("memberEmail");
         Integer fee = (Integer) messageData.get("fee");
         String name = (String) messageData.get("name");
+        String hospitalAdminEmail = (String) messageData.get("hospitalAdmin");
 
         System.out.println("Email: " + memberEmail + ", Fee: " + fee + ", Name: " + name);
         Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
+        Member hospitalAdmin = memberRepository.findByMemberEmail(hospitalAdminEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 병원 admin입니다."));
 
         //결제 취소 실패 admin 알림
         Long adminId = 1L;
         fcmService.sendMessage(adminId, "결제 취소 실패 알림", memberEmail+"님의 "+fee+"원 결제 취소가 실패하였습니다.", Type.PAYMENT_CANCEL_FAIL, null);
 
         //결제자에게 메세지 전송
-        fcmService.sendMessage(member.getId(), "회원 : " + name + " 결제 취소 실패 알림", memberEmail+"님의 "+fee+"원 결제취소가 실패되었습니다.", Type.PAYMENT_CANCEL_FAIL, null);
+        fcmService.sendMessage(hospitalAdmin.getId(), "회원 : " + name + " 결제 취소 실패 알림", memberEmail+"님의 "+fee+"원 결제취소가 실패되었습니다.", Type.PAYMENT_CANCEL_FAIL, null);
 
+        //결제자에게 메세지 전송
+        fcmService.sendMessage(member.getId(), "회원 : " + name + " 결제 취소 실패 알림", memberEmail+"님의 "+fee+"원 결제취소가 실패되었습니다.", Type.PAYMENT_CANCEL_FAIL, null);
 
         // 오프셋 변경
         acknowledgment.acknowledge();
     }
 
-    //
 }
 
 

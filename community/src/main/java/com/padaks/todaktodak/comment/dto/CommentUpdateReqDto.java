@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 public class CommentUpdateReqDto {
-    private Long id;
+    //private Long id;
     private Long postId;
     private String doctorEmail;
     private String content;

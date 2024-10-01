@@ -107,7 +107,7 @@ public class CommentService {
     public void updateComment(Long id, CommentUpdateReqDto dto){
         MemberFeignDto member = getMemberInfo(); //현재 로그인 되어있는 사용자
         Comment comment = commentRepository.findById(id).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 comment입니다."));
-
+        Post post = postRepository.findById(dto.getPostId()).orElseThrow(()->new EntityNotFoundException("존재하지 않는 Post입니다."));
         String type = "COMMENT";
         Map<String, Object> messageData = new HashMap<>();
         //현재 로그인 되어있는 사용자가 comment의 작성자인 경우
@@ -115,8 +115,10 @@ public class CommentService {
             comment.update(dto);
             commentRepository.save(comment);
             //fcm 메세지 데이터 객체 생성
+
             messageData.put("receiverEmail", comment.getDoctorEmail());
-            messageData.put("postId", dto.getPostId());
+            messageData.put("postId", post.getId());
+            messageData.put("title", dto.getContent());
             messageData.put("type", type);
 
             try {

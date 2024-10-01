@@ -89,6 +89,7 @@ public class PaymentService {
 //        System.out.println(impUid);
 
         int fee = medicalChart.getFee();
+        String hospitalAdmin = medicalChart.getReservation().getHospital().getAdminEmail();
 
         String actualImpUid = extractImpUid(impUid);  // impUid 값 추출 함수 사용
 //        System.out.println("Extracted impUid: " + actualImpUid);
@@ -141,7 +142,7 @@ public class PaymentService {
             // 저장 로직
             paymentRepository.save(pay);
             String memberEmail = pay.getMemberEmail();
-            String hospitalAdmin = pay.getMedicalChart().getReservation().getHospital().getAdminEmail();
+
 
             // 메시지 데이터 객체 생성
             Map<String, Object> messageData = new HashMap<>();
@@ -183,6 +184,7 @@ public class PaymentService {
             messageData.put("memberEmail", memberEmail);
             messageData.put("fee", fee);
             messageData.put("impUid", impUid);
+            messageData.put("hospitalAdmin", hospitalAdmin);
 
             // 객체를 JSON 문자열로 변환
             String message = objectMapper.writeValueAsString(messageData);
@@ -202,6 +204,7 @@ public class PaymentService {
         String actualImpUid = extractImpUid(impUid);  // impUid 값 추출 함수 사용
 //        System.out.println("Extracted impUid: " + actualImpUid);
 
+        String hospitalAdmin = medicalChart.getReservation().getHospital().getAdminEmail();
         // impUid를 통해 결제 정보 확인
         IamportResponse<Payment> paymentResponse = iamportClient.paymentByImpUid(actualImpUid);
 
@@ -249,7 +252,7 @@ public class PaymentService {
 
             // 저장 로직
             paymentRepository.save(pay);
-            String hospitalAdmin = pay.getMedicalChart().getReservation().getHospital().getAdminEmail();
+            //String hospitalAdmin = pay.getMedicalChart().getReservation().getHospital().getAdminEmail();
             String memberEmail = pay.getMemberEmail();
             BigDecimal fee = pay.getAmount();
 
@@ -292,6 +295,7 @@ public class PaymentService {
             messageData.put("memberEmail", memberEmail);
             messageData.put("fee", amount);
             messageData.put("impUid", impUid);
+            messageData.put("hospitalAdmin", hospitalAdmin);
 
             // 객체를 JSON 문자열로 변환
             String message = objectMapper.writeValueAsString(messageData);
@@ -315,6 +319,7 @@ public class PaymentService {
 
         // 아임포트 서버에서 결제 정보를 조회
         IamportResponse<Payment> paymentResponse = iamportClient.paymentByImpUid(actualImpUid);
+        String hospitalAdmin = medicalChart.getReservation().getHospital().getAdminEmail();
 
         // 아임포트와 DB 저장 금액이 일치하는지 확인하는 로직
         if (paymentResponse.getResponse() != null) {
@@ -347,6 +352,7 @@ public class PaymentService {
             messageData.put("memberEmail", memberEmail);
             messageData.put("fee", fee);
             messageData.put("name", name);
+            messageData.put("hospitalAdmin",hospitalAdmin);
 
             // 객체를 JSON 문자열로 변환
             String message = objectMapper.writeValueAsString(messageData);
@@ -367,6 +373,7 @@ public class PaymentService {
             messageData.put("memberEmail", memberEmail);
             messageData.put("fee", fee);
             messageData.put("impUid", impUid2);
+            messageData.put("hospitalAdmin", hospitalAdmin);
 
             // 객체를 JSON 문자열로 변환
             String message = objectMapper.writeValueAsString(messageData);
@@ -392,6 +399,7 @@ public class PaymentService {
 //        List<Pay> subscriptionPayments = paymentRepository.findByPaymentMethod(PaymentMethod.SUBSCRIPTION);
         List<Pay> subscriptionPayments = paymentRepository.findByPaymentMethodAndPaymentStatus(
                 PaymentMethod.SUBSCRIPTION, PaymentStatus.SUBSCRIBING);
+
 
         for (Pay pay : subscriptionPayments) {
             System.out.println(pay);
@@ -434,6 +442,7 @@ public class PaymentService {
                         messageData.put("memberEmail", memberEmail);
                         messageData.put("fee", fee);
                         messageData.put("name", name);
+
 
                         // 객체를 JSON 문자열로 변환
                         String message = objectMapper.writeValueAsString(messageData);
