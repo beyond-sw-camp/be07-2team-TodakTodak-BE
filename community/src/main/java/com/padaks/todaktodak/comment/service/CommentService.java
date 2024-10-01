@@ -117,7 +117,7 @@ public class CommentService {
             //fcm 메세지 데이터 객체 생성
 
             messageData.put("receiverEmail", comment.getDoctorEmail());
-            messageData.put("postId", post.getId());
+            messageData.put("postId", post.getTitle());
             messageData.put("title", dto.getContent());
             messageData.put("type", type);
 

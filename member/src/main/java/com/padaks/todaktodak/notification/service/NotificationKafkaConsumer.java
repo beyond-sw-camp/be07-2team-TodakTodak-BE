@@ -40,6 +40,8 @@ public class NotificationKafkaConsumer {
     //자녀 등록 알림
     @KafkaListener(topics = "child-share", groupId = "group_id", containerFactory = "kafkaListenerContainerFactory")
     public void registerNotification(String message) throws JsonProcessingException {
+        // 이스케이프 제거
+        String cleanMessage = message.replace("\\\"", "\"");
         // JSON 문자열을 Map으로 변환
         Map<String, Object> messageData = objectMapper.readValue(message,new TypeReference<Map<String, Object>>() {} );
         System.out.println("Received Payment Success message: " + messageData);
@@ -59,29 +61,35 @@ public class NotificationKafkaConsumer {
 
     // 커뮤니티 알림
     @KafkaListener(topics = "community-success", groupId = "group_id", containerFactory = "kafkaListenerContainerFactory")
-    public void consumerNotification(String message) throws JsonProcessingException{
-        Map<String, Object> messageData = objectMapper.readValue(message, new TypeReference<Map<String, Object>>() {});
+    public void consumerNotification(String message) throws JsonProcessingException {
+        // 이스케이프 제거
+        String cleanMessage = message.replace("\\\"", "\"").replace("\"{", "{").replace("}\"", "}");
+
+        // JSON을 Map으로 변환
+        Map<String, Object> messageData = objectMapper.readValue(cleanMessage, new TypeReference<Map<String, Object>>() {});
         System.out.println("Received community Success message: " + messageData);
 
         String memberEmail = (String) messageData.get("receiverEmail");
-        Long postId = (Long) messageData.get("postId");
+        // postId를 Integer로 읽고 Long으로 변환
+        Long postId = ((Integer) messageData.get("postId")).longValue();
         String title = (String) messageData.get("title");
-        Type type = (Type) messageData.get("type");
+        Type type = Type.valueOf((String) messageData.get("type"));  // Enum 타입 변환
 
-        Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
+        Member member = memberRepository.findByMemberEmail(memberEmail)
+                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 회원입니다."));
 
         String category = "";
-        if (type.equals(Type.POST)){
+        if (type.equals(Type.POST)) {
             category = "질문 알림";
-            fcmService.sendMessage(member.getId(), category, "질문 :" +title+ "에 대한 답변이 작성되었습니다.",  Type.POST,postId);
-
-        }else if (type.equals(Type.COMMENT)){
+            fcmService.sendMessage(member.getId(), category, "질문 :" + title + "에 대한 답변이 작성되었습니다.", Type.POST, postId);
+        } else if (type.equals(Type.COMMENT)) {
             category = "답변 알림";
             String comment = "에 작성한 답변";
-            fcmService.sendMessage(member.getId(), category, "질문 :" +title+comment+"에 대한 답변이 작성되었습니다.",  Type.COMMENT, postId);
-
+            fcmService.sendMessage(member.getId(), category, "질문 :" + title + comment + "에 대한 답변이 작성되었습니다.", Type.COMMENT, postId);
         }
     }
+
+
 
     //좋아요 알림
 
@@ -190,8 +198,6 @@ public class NotificationKafkaConsumer {
         //결제자에게 메세지 전송
         fcmService.sendMessage(member.getId(), "회원 : " + name + " 결제 취소 알림", memberEmail+"님의 "+fee+"원 결제가 취소되었습니다.", Type.PAYMENT_CANCEL, null);
 
-
-
         // 오프셋 변경
         acknowledgment.acknowledge();
     }
@@ -232,6 +238,43 @@ public class NotificationKafkaConsumer {
         acknowledgment.acknowledge();
     }
 
+    //병원 당일 예약 알림
+    @KafkaListener(topics = "reservationImmediate", groupId = "Schedule_id", containerFactory = "ppKafkaListenerContainerFactory")
+    public void immediateReservationNotification(String message) throws JsonProcessingException {
+        String cleanMessage = message.replace("\\\"", "\"").replace("\"{", "{").replace("}\"", "}");
+
+        // JSON을 Map으로 변환
+        Map<String, Object> messageData = objectMapper.readValue(cleanMessage, new TypeReference<Map<String, Object>>() {});
+        System.out.println("Received community Success message: " + messageData);
+
+        ReservationSaveReqDto dto = objectMapper.readValue(cleanMessage, ReservationSaveReqDto.class);
+
+        String memberEmail = dto.getMemberEmail();
+        Member member = memberRepository.findByMemberEmail(memberEmail).orElseThrow(()-> new EntityNotFoundException("존재하지 않는 회원입니다."));
+        Member doctor = memberRepository.findByMemberEmail(dto.getDoctorEmail()).orElseThrow(()->new EntityNotFoundException("존재하지 않는 의사입니다."));
+        String reservationType = dto.getReservationType();
+        String reservationDate = String.valueOf(dto.getReservationDate());
+        String reservationTime = String.valueOf(dto.getReservationTime());
+        String medicalItem = dto.getMedicalItem();  //일반진료, 예방접종 ..
+        Long childId = dto.getChildId();
+
+//        System.out.println("========================================");
+//        System.out.println(memberEmail);
+//        System.out.println(member.getId());
+        //예약자에게 전송
+        fcmService.sendMessage(member.getId(), reservationType+"예약 성공 알림",
+                "예약일: " +  reservationDate + "\n"
+                        + "예약시간: " + reservationTime + "\n"
+                        + "예약구분 : " + medicalItem + "\n"
+                        +doctor.getName()+"선생님 진료예약되었습니다.",Type.RESERVATION_NOTIFICATION, childId);
+
+        //의사에게 전송
+        fcmService.sendMessage(doctor.getId(), reservationType+"예약 성공 알림",
+                "예약일: " +  reservationDate + "\n"
+                        + "예약시간: "+ reservationTime + "\n"
+                        + "예약구분 : " + medicalItem + "\n"
+                        + member.getName()+"님 진료예약되었습니다.",Type.RESERVATION_NOTIFICATION, childId);
+    }
 }
 
 

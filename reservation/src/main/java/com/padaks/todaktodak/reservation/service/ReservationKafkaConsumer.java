@@ -96,59 +96,79 @@ public class ReservationKafkaConsumer {
     @KafkaListener(topics = "reservationSchedule", groupId = "Schedule_id", containerFactory = "ppKafkaListenerContainerFactory")
     public void scheduledReservation(String message, Acknowledgment acknowledgment) {
         log.info("ReservationConsumer[consumerReservation] : Kafka 메시지 수신");
+
+        // 메시지 검증
+        if (message == null || message.isEmpty()) {
+            log.error("Received empty or null message");
+            if (acknowledgment != null) {
+                acknowledgment.acknowledge();
+            }
+            return; // 또는 예외 처리
+        }
+
+        // 메시지 정제
         if (message.startsWith("\"") && message.endsWith("\"")) {
-            message = message.substring(1, message.length() -1).replace("\"", "\"");
+            message = message.substring(1, message.length() - 1).replace("\"", "\"");
             message = message.replace("\\", "");
         }
-        try {
-            ReservationSaveReqDto dto =
-                    objectMapper.readValue(message, ReservationSaveReqDto.class);
 
-            String lockKey = dto.getDoctorEmail() + ":"+ dto.getReservationDate()+ ":" + dto.getReservationTime();
-//            해당 lock 이 2분동안 유지되도록 설정.
-//            2 : 얼마나 유지할 것인가
-//            TimeUnit.MINUTES :
-//                  MINUTES - 분
-//                  HOURS - 시간
-//                  DAYS - 일
+        try {
+            // JSON 변환
+            ReservationSaveReqDto dto = objectMapper.readValue(message, ReservationSaveReqDto.class);
+
+            // 락 키 생성
+            String lockKey = dto.getDoctorEmail() + ":" + dto.getReservationDate() + ":" + dto.getReservationTime();
             Boolean isLockState;
-            if (redisScheduleTemplate != null && redisScheduleTemplate.opsForValue() != null) {
+
+            // Redis 템플릿 검증
+            if (redisScheduleTemplate != null) {
                 isLockState = redisScheduleTemplate.opsForValue().setIfAbsent(lockKey, "LOCKED", 2, TimeUnit.MINUTES);
             } else {
-                // 로그 출력 또는 예외 처리
+                log.error("Redis template is null");
                 throw new BaseException(REDIS_ERROR);
             }
-            if(Boolean.TRUE.equals(isLockState)){
-                try{
-                    //        진료 예약 시 해당 의사 선생님의 예약이 존재할 경우 Exception을 발생 시키기 위한 코드
-                    reservationRepository.findByDoctorEmailAndReservationDateAndReservationTime
-                                    (dto.getDoctorEmail(), dto.getReservationDate(), dto.getReservationTime())
+
+            // 락 상태 확인
+            if (Boolean.TRUE.equals(isLockState)) {
+                try {
+                    // 중복 예약 체크
+                    reservationRepository.findByDoctorEmailAndReservationDateAndReservationTime(
+                                    dto.getDoctorEmail(), dto.getReservationDate(), dto.getReservationTime())
                             .ifPresent(reservation -> {
                                 throw new BaseException(RESERVATION_DUPLICATE);
                             });
+
+                    // 병원 정보 조회
                     Hospital hospital = hospitalRepository.findById(dto.getHospitalId())
                             .orElseThrow(() -> new BaseException(HOSPITAL_NOT_FOUND));
+
+                    // 예약 생성 및 저장
                     Reservation reservation = dtoMapper.toReservation(dto, hospital);
                     Reservation savedReservation = reservationRepository.save(reservation);
                     sendReservationNotification(savedReservation);
-                }finally {
+                } finally {
+                    // 락 해제
                     redisScheduleTemplate.delete(lockKey);
                     log.info("ReservationConsumer[consumerReservation] : 락 해제 완료");
                 }
-            }else{
+            } else {
                 log.info("ReservationConsumer[consumerReservation] : 락을 얻지 못함, 예약 처리 실패");
                 throw new BaseException(LOCK_OCCUPANCY);
             }
         } catch (JsonProcessingException e) {
-            log.error("Kafka 메시지 처리중 JSON 처리 오류 발생: {}", e.getMessage());
-        } catch (BaseException e){
-            log.error("Kafka 메시지 처리중 JSON 처리 오류 발생: {}", e.getMessage());
-        }
-        finally {
-            // 예외 여부에 상관없이 메시지는 acknowledge 처리
-            acknowledgment.acknowledge();
+            log.error("Kafka 메시지 처리중 JSON 처리 오류 발생: {}", e.getMessage(), e);
+        } catch (BaseException e) {
+            log.error("Kafka 메시지 처리중 비즈니스 예외 발생: {}", e.getMessage(), e);
+        } catch (Exception e) {
+            log.error("Kafka 메시지 처리중 알 수 없는 오류 발생: {}", e.getMessage(), e);
+        } finally {
+            // Acknowledge 처리
+            if (acknowledgment != null) {
+                acknowledgment.acknowledge();
+            }
         }
     }
+
 
     public void sendReservationNotification(Reservation reservation) {
         MemberResDto member = memberFeign.getMemberByEmail(reservation.getMemberEmail());

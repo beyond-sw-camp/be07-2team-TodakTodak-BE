@@ -46,4 +46,14 @@ public class KafkaConsumerConfig {
         return factory;
     }
 
+    @Bean(name = "ppKafkaListenerContainerFactory")
+    public ConcurrentKafkaListenerContainerFactory<String, Object> ppKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory());
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
+
+        System.out.println("ppKafkaListenerContainerFactory Bean has been created!");
+
+        return factory;
+    }
 }
