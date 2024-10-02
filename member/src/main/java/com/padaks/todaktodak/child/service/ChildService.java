@@ -156,6 +156,7 @@ public class ChildService {
         String message = null;
         try {
             message = objectMapper.writeValueAsString(messageData);
+            log.info("전송할 메세지: {}", message);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("객체를 JSON 문자열로 변환하는데 실패했습니다.");
         }
