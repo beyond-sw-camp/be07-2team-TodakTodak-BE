@@ -15,4 +15,5 @@ public class CreateReviewReqDto {
     private Long id;
     private int rating;
     private String contents;
+
 }

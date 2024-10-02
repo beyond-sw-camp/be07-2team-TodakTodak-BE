@@ -45,4 +45,5 @@ public class KafkaReservationConsumerConfig {
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL);
         return factory;
     }
+
 }

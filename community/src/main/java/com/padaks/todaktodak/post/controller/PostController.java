@@ -76,8 +76,63 @@ public class PostController {
             CommonErrorDto commonErrorDto = new CommonErrorDto(HttpStatus.NOT_FOUND, e.getMessage());
             return new ResponseEntity<>(commonErrorDto, HttpStatus.NOT_FOUND);
         }
-
     }
 
+    // 조회수 증가 및 조회
+    @GetMapping("/detail/views/{id}")
+    public ResponseEntity<?> getPostViews(@PathVariable Long id) {
+        try {
+            postService.incrementPostViews(id); // 조회수 증가
+            Long views = postService.getPostViews(id); // 조회수 조회
+            CommonResDto commonResDto = new CommonResDto(HttpStatus.OK, "조회수를 조회합니다.", views);
+            return new ResponseEntity<>(commonResDto, HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
+            CommonErrorDto commonErrorDto = new CommonErrorDto(HttpStatus.INTERNAL_SERVER_ERROR, "조회수 조회 실패: " + e.getMessage());
+            return new ResponseEntity<>(commonErrorDto, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // 좋아요 추가
+    @PostMapping("/detail/like/{id}")
+    public ResponseEntity<?> likePost(@PathVariable Long id) {
+        try {
+            postService.likePost(id);
+            CommonResDto commonResDto = new CommonResDto(HttpStatus.OK, "좋아요가 추가되었습니다.", null);
+            return new ResponseEntity<>(commonResDto, HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
+            CommonErrorDto commonErrorDto = new CommonErrorDto(HttpStatus.INTERNAL_SERVER_ERROR, "좋아요 추가 실패: " + e.getMessage());
+            return new ResponseEntity<>(commonErrorDto, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // 좋아요 취소
+    @PostMapping("/detail/unlike/{id}")
+    public ResponseEntity<?> unlikePost(@PathVariable Long id) {
+        try {
+            postService.unlikePost(id);
+            CommonResDto commonResDto = new CommonResDto(HttpStatus.OK, "좋아요가 취소되었습니다.", null);
+            return new ResponseEntity<>(commonResDto, HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
+            CommonErrorDto commonErrorDto = new CommonErrorDto(HttpStatus.INTERNAL_SERVER_ERROR, "좋아요 취소 실패: " + e.getMessage());
+            return new ResponseEntity<>(commonErrorDto, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // 좋아요 수 조회
+    @GetMapping("/detail/{id}/likes")
+    public ResponseEntity<?> getPostLikesCount(@PathVariable Long id) {
+        try {
+            Long likesCount = postService.getPostLikesCount(id);
+            CommonResDto commonResDto = new CommonResDto(HttpStatus.OK, "좋아요 수를 조회합니다.", likesCount);
+            return new ResponseEntity<>(commonResDto, HttpStatus.OK);
+        } catch (Exception e) {
+            e.printStackTrace();
+            CommonErrorDto commonErrorDto = new CommonErrorDto(HttpStatus.INTERNAL_SERVER_ERROR, "좋아요 수 조회 실패: " + e.getMessage());
+            return new ResponseEntity<>(commonErrorDto, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 
 }

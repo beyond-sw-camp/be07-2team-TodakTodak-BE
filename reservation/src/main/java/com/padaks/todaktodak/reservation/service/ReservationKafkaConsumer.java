@@ -63,7 +63,7 @@ public class ReservationKafkaConsumer {
         this.hospitalRepository = hospitalRepository;
     }
 
-    @KafkaListener(topics = "reservationImmediate", groupId = "group_id", containerFactory = "ppKafkaListenerContainerFactory")
+    @KafkaListener(topics = "reservationImmediate", groupId = "Schedule_id", containerFactory = "ppKafkaListenerContainerFactory")
     public void immediateReservation(String message, Acknowledgment acknowledgment) {
         log.info("ReservationConsumer[immediateReservation] : Kafka 메시지 수신");
 

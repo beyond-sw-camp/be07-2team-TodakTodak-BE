@@ -41,10 +41,6 @@ public class Comment extends BaseTimeEntity{
     @JoinColumn(name = "parent_id")
     private Comment parent;
 
-    @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL)
-    @Builder.Default
-    private List<Report> reportList = new ArrayList<>();
-
     public CommentDetailDto listFromEntity(){
         return CommentDetailDto.builder()
                 .id(this.id)

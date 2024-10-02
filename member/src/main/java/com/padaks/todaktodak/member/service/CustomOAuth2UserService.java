@@ -50,7 +50,7 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
 
 
         if (member.getName() == null){
-            String temp = "이름을 변경해주세요";
+            String temp = "이름을 입력해주세요";
             member.updateName(temp);
         }
         if (member.getPassword() == null) {
@@ -58,8 +58,12 @@ public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequ
             member.updatePass(uuidPass);
         }
         if (member.getAddress() == null){
-            String address = "임시주소입니다. 변경해주세요";
+            String address = "임시주소입니다. 주소를 변경해주세요";
             member.updateAddress(address);
+        }
+        if (member.getPhoneNumber() == null){
+            String phone = "핸드폰 번호를 입력해주세요";
+            member.updatePhoneNumber(phone);
         }
 //        if (member.isVerified() == false) {
 //            member.updateVerified();

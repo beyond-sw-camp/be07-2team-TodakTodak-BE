@@ -23,21 +23,21 @@ public class PostDetailDto {
     private String title;
     private String content;
     private String postImgUrl;
-    private int likeCount;
-    private int viewCount;
+    private Long likeCount;
+    private Long viewCount;
     private LocalDateTime createdTimeAt;
     private LocalDateTime updatedTimeAt;
     private List<CommentDetailDto> comments;
 
-    public static PostDetailDto fromEntity(Post post, List<CommentDetailDto> comments){
+    public static PostDetailDto fromEntity(Post post, List<CommentDetailDto> comments, Long viewCount, Long likeCount ){
         return PostDetailDto.builder()
                 .id(post.getId())
                 .memberEmail(post.getMemberEmail())
                 .title(post.getTitle())
                 .content(post.getContent())
                 .postImgUrl(post.getPostImgUrl())
-                .likeCount(post.getLikeCount())
-                .viewCount(post.getViewCount())
+                .likeCount(likeCount)
+                .viewCount(viewCount)
                 .createdTimeAt(post.getCreatedTimeAt())
                 .updatedTimeAt(post.getUpdatedTimeAt())
                 .comments(comments)

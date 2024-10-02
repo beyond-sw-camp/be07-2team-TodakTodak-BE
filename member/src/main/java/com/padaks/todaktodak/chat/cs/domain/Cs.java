@@ -1,8 +1,10 @@
 package com.padaks.todaktodak.chat.cs.domain;
 
 import com.padaks.todaktodak.chat.chatroom.domain.ChatRoom;
+import com.padaks.todaktodak.chat.cs.dto.CsUpdateReqDto;
 import com.padaks.todaktodak.common.domain.BaseTimeEntity;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -12,6 +14,7 @@ import javax.persistence.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
+@Builder
 public class Cs extends BaseTimeEntity {
 
     @Id
@@ -19,12 +22,19 @@ public class Cs extends BaseTimeEntity {
     @Column(name = "cs_id")
     private Long id;
 
-    private String csContents;
+    private String csContents; // 상담내역
 
     @Enumerated(EnumType.STRING)
-    private CsStatus csStatus;
+    private CsStatus csStatus; // 상담처리상태
 
-    @OneToOne(mappedBy = "cs")
-    private ChatRoom chatRoom;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "chat_room_id")
+    private ChatRoom chatRoom; // 채팅방
 
+    public void updateCs(CsUpdateReqDto dto,
+                         ChatRoom chatRoom){
+        this.csContents = dto.getCsContents();
+        this.csStatus = dto.getCsStatus();
+        this.chatRoom = chatRoom;
+    }
 }

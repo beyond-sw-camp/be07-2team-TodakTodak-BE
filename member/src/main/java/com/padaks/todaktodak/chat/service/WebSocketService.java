@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.EntityNotFoundException;
+import java.time.LocalDateTime;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -28,22 +29,20 @@ public class WebSocketService {
     private final SimpMessageSendingOperations messagingTemplate;
 
     public void sendMessage(Long chatRoomId, String memberEmail, ChatMessageReqDto dto){
-        log.info("DTO: {}", dto);
         // chat room 찾기
         ChatRoom chatRoom = chatRoomRepository.findByIdOrThrow(dto.getChatRoomId());
-        log.info("ChatRoom: {}", chatRoom);
 
-        System.out.println("여기까지");
-        System.out.println("멤버 이메일은" + memberEmail);
-        log.info("시큐리티 Member Email: {}", memberEmail);
+        // 최근 채팅시간 업데이트
+        chatRoom.updateRecentChatTime(LocalDateTime.now());
+
         // 보낸 사람 찾기
         Member sender = memberRepository.findByMemberEmailOrThrow(memberEmail);
-        log.info("Sender: {}", sender);
+
         ChatMessage chatMessage = ChatMessageReqDto.toEntity(chatRoom, sender, dto.getContents());
         chatMessageRepository.save(chatMessage); // 메시지 저장
 
         ChatMessageReqDto messageDto = ChatMessageReqDto.fromEntity(dto, chatRoom, sender);
-
+        log.info("messageDto : {}", messageDto);
         messagingTemplate.convertAndSend("/sub/" + chatRoomId, messageDto);
     }
 }

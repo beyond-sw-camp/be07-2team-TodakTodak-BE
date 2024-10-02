@@ -34,9 +34,9 @@ public class Post extends BaseTimeEntity {
     @Column
     private String postImgUrl;
     @ColumnDefault("0")
-    private int likeCount;
+    private Long likeCount;
     @ColumnDefault("0")
-    private int viewCount;
+    private Long viewCount;
 
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL)
     @Builder.Default

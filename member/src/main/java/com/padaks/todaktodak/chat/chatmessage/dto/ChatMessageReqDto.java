@@ -22,6 +22,8 @@ public class ChatMessageReqDto {
 
     private String senderName; // 보낸 사람 이름
 
+    private String memberEmail; // 보낸 사람 이메일
+
     public static ChatMessage toEntity(ChatRoom chatRoom,
                                        Member sender,
                                        String contents
@@ -38,6 +40,7 @@ public class ChatMessageReqDto {
                 .chatRoomId(chatRoom.getId())
                 .contents(dto.getContents())
                 .senderName(sender.getName()) // senderName 추가
+                .memberEmail(sender.getMemberEmail()) // memberEmail 추가
                 .build();
     }
 }

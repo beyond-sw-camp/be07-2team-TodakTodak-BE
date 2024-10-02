@@ -17,7 +17,7 @@ public class CsResDto {
 
     private String csContents;
 
-    private CsStatus csStatus;
+    private String csStatus;
 
     private Long chatRoomId;
 
@@ -25,7 +25,7 @@ public class CsResDto {
         return CsResDto.builder()
                 .id(cs.getId())
                 .csContents(cs.getCsContents())
-                .csStatus(cs.getCsStatus())
+                .csStatus(cs.getCsStatus().getValue())
                 .chatRoomId(cs.getChatRoom().getId())
                 .build();
     }

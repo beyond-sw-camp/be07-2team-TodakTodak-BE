@@ -13,8 +13,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @Builder
 public class ReportSaveReqDto {
-    private String reporterEmail; //신고자
-    private String reportedEmail; //피신고자
     private String reason;
     private Long postId;
     private Long commentId;

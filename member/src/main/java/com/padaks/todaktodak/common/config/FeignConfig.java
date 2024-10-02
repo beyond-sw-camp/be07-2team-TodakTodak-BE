@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.StringUtils;
 
 @Configuration
 public class FeignConfig {
@@ -12,9 +13,14 @@ public class FeignConfig {
     @Bean
     public RequestInterceptor requestInterceptor(){
         return request -> {
-            //모든 feign 요청에 전역적으로 token을 세팅할 수 있음
-            String token = (String) SecurityContextHolder.getContext().getAuthentication().getCredentials();
-            request.header(HttpHeaders.AUTHORIZATION, "Bearer "+token);
+            // SecurityContextHolder에서 인증 정보를 가져와 토큰을 설정
+            if (SecurityContextHolder.getContext().getAuthentication() != null &&
+                    SecurityContextHolder.getContext().getAuthentication().getCredentials() != null) {
+                String token = (String) SecurityContextHolder.getContext().getAuthentication().getCredentials();
+                if (StringUtils.hasText(token)) {
+                    request.header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+                }
+            }
         };
     }
 }

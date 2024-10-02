@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.padaks.todaktodak.chatroom.service.UntactChatRoomService;
 import com.padaks.todaktodak.common.dto.DtoMapper;
+import com.padaks.todaktodak.common.dto.MemberFeignDto;
 import com.padaks.todaktodak.common.exception.BaseException;
+import com.padaks.todaktodak.common.feign.MemberFeignClient;
 import com.padaks.todaktodak.hospital.domain.Hospital;
 import com.padaks.todaktodak.hospital.repository.HospitalRepository;
 import com.padaks.todaktodak.reservation.domain.Reservation;
@@ -21,11 +23,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -46,7 +51,6 @@ public class ReservationService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final HospitalRepository hospitalRepository;
 
-    private static final String RESERVATION_LIST_KEY = "doctor_";
     private final MemberFeign memberFeign;
     private final UntactChatRoomService untactChatRoomService;
 
@@ -155,5 +159,25 @@ public class ReservationService {
         RedisDto redisDto = dtoMapper.toRedisDto(reservation);
         String key = reservation.getHospital().getId() + ":" + reservation.getDoctorEmail();
         return redisTemplate.opsForZSet().rank(key, redisDto);
+    }
+
+//    스케줄 예약 노쇼 스케줄 동작 구현
+    public List<String> reservationNoShowSchedule(){
+        log.info("예약 노쇼 스케줄 동작");
+        LocalDate localDate = LocalDate.now();
+        LocalTime localTime = LocalTime.now().withNano(0).withSecond(0);
+
+        List<Reservation> reservation =
+                reservationRepository.findAllByReservationDateAndReservationTime(localDate,localTime);
+        List<String> member = new ArrayList<>();
+
+        for(Reservation res : reservation){
+            if(!res.getStatus().equals(Status.Completed)) {
+                res.updateStatus(Status.Noshow);
+                member.add(res.getMemberEmail());
+            }
+        }
+        log.info("예약 노쇼 스케줄 종료");
+        return member;
     }
 }

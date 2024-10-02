@@ -16,7 +16,7 @@ public class PostListDto {
     private String memberEmail;
     private String title;
     private String content;
-    private int likeCount;
-    private int viewCount;
+    private Long likeCount;
+    private Long viewCount;
     private LocalDateTime createdTimeAt;
 }

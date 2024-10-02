@@ -32,7 +32,13 @@ public class ChatRoom extends BaseTimeEntity {
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL)
     private List<ChatMessage> chatMessages = new ArrayList<>();
 
-    @OneToOne
-    @JoinColumn(name = "cs_id")
-    private Cs cs;
+    @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL)
+    private List<Cs> csList = new ArrayList<>(); // 소프트 delete 때문에 1:N 관계로 변경
+
+    private LocalDateTime recentChatTime; // 최근 채팅 시간
+
+    public void updateRecentChatTime(LocalDateTime now) { // 최근 채팅시간 업데이트
+        this.recentChatTime = now;
+    }
+
 }

@@ -2,18 +2,19 @@ package com.padaks.todaktodak.member.service;
 
 import com.padaks.todaktodak.common.dto.DtoMapper;
 import com.padaks.todaktodak.common.exception.BaseException;
-import com.padaks.todaktodak.common.feign.HospitalFeignClient;
+import com.padaks.todaktodak.common.feign.ReservationFeignClient;
 import com.padaks.todaktodak.config.JwtTokenProvider;
+import com.padaks.todaktodak.member.domain.Address;
 import com.padaks.todaktodak.member.domain.Member;
 import com.padaks.todaktodak.member.domain.Role;
 import com.padaks.todaktodak.member.dto.*;
 import com.padaks.todaktodak.member.repository.MemberRepository;
-import com.padaks.todaktodak.notification.domain.Type;
 import com.padaks.todaktodak.util.S3ClientFileUpload;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.persistence.EntityNotFoundException;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Random;
 
 import static com.padaks.todaktodak.common.exception.exceptionType.MemberExceptionType.MEMBER_NOT_FOUND;
@@ -38,7 +40,7 @@ public class MemberService {
     private final RedisService redisService;
     private final DtoMapper dtoMapper;
     private final S3ClientFileUpload s3ClientFileUpload;
-    private final HospitalFeignClient hospitalFeignClient;
+    private final ReservationFeignClient reservationFeignClient;
     private final FcmService fcmService;
 
     // 간편하게 멤버 객체를 찾기 위한 findByMemberEmail
@@ -167,7 +169,7 @@ public class MemberService {
     }
 
 
-    // 비밀번호 확인 및 검증 로렢
+    // 비밀번호 확인 및 검증 로
     private void validatePassword(String newPassword, String confirmPassword, String currentPassword) {
         if (!newPassword.equals(confirmPassword)) {
             throw new RuntimeException("동일하지 않은 비밀번호 입니다.");
@@ -242,7 +244,7 @@ public class MemberService {
 
         // 이름, 전화번호, 주소 업데이트
         if (editReqDto.getName() != null) {
-            if (editReqDto.getName().equals("이름을 변경해주세요")){
+            if (editReqDto.getName().equals("이름을 입력해주세요")){
                 throw new Exception("이름을 변경해주세요");
             }else {
                 member.changeName(editReqDto.getName());
@@ -262,7 +264,8 @@ public class MemberService {
             isUpdated = true;
         }
         if (editReqDto.getAddress() != null) {
-            member.changeAddress(editReqDto.getAddress());
+            Address newAddress = new Address(editReqDto.getAddress().getCity(), editReqDto.getAddress().getStreet(), editReqDto.getAddress().getZipcode());
+            member.changeAddress(newAddress);
             System.out.println("주소가 변경되었습니다: " + member.getAddress());
             isUpdated = true;
         }
@@ -368,7 +371,7 @@ public class MemberService {
 
     // 병원 정보 가져오는 feign
     public HospitalFeignDto getHospital(){
-        HospitalFeignDto hospitalFeignDto = hospitalFeignClient.getHospitalInfo();
+        HospitalFeignDto hospitalFeignDto = reservationFeignClient.getHospitalInfo();
         return hospitalFeignDto;
     }
 
@@ -376,10 +379,6 @@ public class MemberService {
     public String findId(MemberFindIdDto findIdDto) {
         Member member = memberRepository.findByNameAndPhoneNumber(findIdDto.getName(), findIdDto.getPhoneNumber())
                 .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 회원입니다."));
-        System.out.println(findIdDto.getName());
-        System.out.println(findIdDto.getPhoneNumber());
-        System.out.println(member);
-        System.out.println(member.getMemberEmail());
         return maskEmail(member.getMemberEmail());
     }
 
@@ -388,4 +387,54 @@ public class MemberService {
         return email.substring(0, 4) + "******" + email.substring(email.indexOf("@"));
     }
 
+    // 비밀번호 재설정 링크 전송
+    public void sendPasswordResetLink(MemberFindPasswordDto dto) {
+        Member member = memberRepository.findByMemberEmail(dto.getMemberEmail())
+                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 회원입니다."));
+        // userId를 추가 인자로 전달하여 토큰 생성
+        String resetToken = jwtTokenprovider.createToken(member.getMemberEmail(), member.getRole().name(), member.getId());
+
+        // Redis에 저장 (필요한 경우)
+        redisService.saveVerificationCode(dto.getMemberEmail(), resetToken);
+
+        // 이메일 전송
+//        String passwordResetLink = "https://www.teenkiri.site/user/reset-password?token=" + resetToken;
+//        "http:localhost8080://member-service/member/reset/password"
+        // 비밀번호 재설정 링크 URL 수정
+        String passwordResetLink = "http://localhost:8081/member/reset/password?token=" + resetToken;
+
+        emailService.sendSimpleMessage(dto.getMemberEmail(), "비밀번호 재설정", "비밀번호 재설정 링크: " + passwordResetLink);
+    }
+
+    // 비밀번호 재설정
+    public void resetPassword(PasswordResetDto dto) {
+        String email = jwtTokenprovider.getEmailFromToken(dto.getToken());
+        Member member = memberRepository.findByMemberEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 회원입니다."));
+
+        validatePassword(dto.getNewPassword(), dto.getConfirmPassword(), member.getPassword());
+
+        member.resetPassword(passwordEncoder.encode(dto.getNewPassword()));
+        memberRepository.save(member);
+    }
+//    Noshow 카운트 증가
+    @Scheduled(cron = "0 0,30 9-12,13-22 * * *")
+    public void updateNoShowCount(){
+        log.info("노쇼 카운트 스케줄 시작");
+        String token = jwtTokenprovider.createToken("todka@test.com", Role.TodakAdmin.name(), 0L);
+        List<String> mem = reservationFeignClient.getMember("Bearer " + token);
+        for(String email : mem){
+            Member member = memberRepository.findByMemberEmail(email)
+                    .orElseThrow(() -> new BaseException(MEMBER_NOT_FOUND));
+            member.incressNoShowCount();
+        }
+        log.info("노쇼 카운트 스케줄 종료");
+    }
+    // 신고 카운트 증가시키는 메서드
+    public int reportCountUp(String email) {
+        log.info(email);
+        Member member = memberRepository.findByMemberEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("존재하지 않는 회원입니다."));
+        return member.reportCountUp();
+    }
 }

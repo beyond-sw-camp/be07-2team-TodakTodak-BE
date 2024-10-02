@@ -59,4 +59,9 @@ public class ReservationController {
         Long res = reservationService.rankReservationQueue(id);
         return new ResponseEntity<>(res, HttpStatus.OK);
     }
+
+    @GetMapping("/get/member")
+    public List<String> getMember(){
+        return reservationService.reservationNoShowSchedule();
+    }
 }

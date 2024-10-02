@@ -41,7 +41,6 @@ public class ReportService {
         String reportedEmail = null;
 
         MemberFeignDto member = getMemberInfo(); //현재 로그인한 사용자 정보
-        member.getMemberEmail();
 
         if (dto.getPostId() != null){
             post = postRepository.findById(dto.getPostId()).orElseThrow(()->new EntityNotFoundException("존재하지 않는 post입니다."));
@@ -52,12 +51,10 @@ public class ReportService {
             reportedEmail = comment.getDoctorEmail();
         }
 
-        //member의 report count 어떻게 +1..???????
-//        if (reportedEmail != null){
-//            memberFeignClient
-//
-//        }
+
         String reporterEmail = member.getMemberEmail();
+        log.info(reportedEmail);
+        memberFeignClient.reportCountUp(reportedEmail);
 
         Report report = dto.toEntity(post, comment, reporterEmail, reportedEmail);
         report = reportRepository.save(report);

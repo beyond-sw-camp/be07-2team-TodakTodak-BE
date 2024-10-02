@@ -1,7 +1,9 @@
 package com.padaks.todaktodak.member.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.padaks.todaktodak.common.dto.CommonErrorDto;
 import com.padaks.todaktodak.common.dto.CommonResDto;
+import com.padaks.todaktodak.member.domain.Address;
 import com.padaks.todaktodak.member.domain.Member;
 import com.padaks.todaktodak.member.dto.*;
 import com.padaks.todaktodak.member.service.MemberAuthService;
@@ -10,8 +12,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -156,13 +160,32 @@ public class MemberController {
     // 회원 정보 수정
     @PostMapping("/edit-info")
     public ResponseEntity<?> editMemberInfo(
-            @ModelAttribute MemberUpdateReqDto updateReqDto) {
+            @RequestParam("name") String name,
+            @RequestParam("phoneNumber") String phoneNumber,
+            @RequestParam("address") String addressJson, // JSON 문자열로 받은 주소
+            @RequestParam(value = "profileImage", required = false) MultipartFile profileImage,
+            @RequestParam(value = "password", required = false) String password,
+            @RequestParam(value = "confirmPassword", required = false) String confirmPassword) {
         try {
+            // JSON 문자열을 Address 객체로 변환
+            ObjectMapper objectMapper = new ObjectMapper();
+            Address address = objectMapper.readValue(addressJson, Address.class);
+
             String email = SecurityContextHolder.getContext().getAuthentication().getName();
             Member member = memberService.findByMemberEmail(email);
 
+            // DTO 생성 및 값 설정
+            MemberUpdateReqDto updateReqDto = MemberUpdateReqDto.builder()
+                    .name(name)
+                    .phoneNumber(phoneNumber)
+                    .address(address)
+                    .profileImage(profileImage)
+                    .password(password)
+                    .confirmPassword(confirmPassword)
+                    .build();
+
             // 회원 정보 업데이트
-            memberService.updateMember(member, updateReqDto); // profileImage 추가
+            memberService.updateMember(member, updateReqDto); // profileImage 포함 업데이트
 
             return ResponseEntity.ok(new CommonResDto(HttpStatus.OK, "회원 정보를 수정하였습니다.", member));
         } catch (EntityNotFoundException e) {
@@ -171,10 +194,10 @@ public class MemberController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(new CommonResDto(HttpStatus.BAD_REQUEST, "회원 정보 수정에 실패했습니다:" +
-                            " " + e.getMessage(), null));
+                    .body(new CommonResDto(HttpStatus.BAD_REQUEST, "회원 정보 수정에 실패했습니다: " + e.getMessage(), null));
         }
     }
+
 
     // 의사 정보 수정
     @PostMapping("/edit-doctor")
@@ -285,6 +308,54 @@ public class MemberController {
             CommonErrorDto commonErrorDto = new CommonErrorDto(HttpStatus.BAD_REQUEST, "이메일 찾기에 실패했습니다.");
             return new ResponseEntity<>(commonErrorDto, HttpStatus.BAD_REQUEST);
         }
+    }
+
+    // 비밀번호 재설정 링크 전송
+    @PostMapping("/find/password")
+    public ResponseEntity<?> findPassword(@RequestBody MemberFindPasswordDto dto) {
+        try {
+            memberService.sendPasswordResetLink(dto);
+            return ResponseEntity.ok(new CommonResDto(HttpStatus.OK, "비밀번호 재설정 링크를 전송하였습니다.", null));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new CommonResDto(HttpStatus.BAD_REQUEST, "올바른 이메일을 입력해주세요.", null));
+        }
+    }
+
+    @GetMapping("/reset/password")
+    public ResponseEntity<?> showResetPasswordPage(@RequestParam("token") String token) {
+        // 토큰 유효성 검사 등 추가 로직 수행 가능
+
+        // 이 단계에서 Vue.js로의 페이지 렌더링을 의도
+        // ResponseEntity는 JSON 응답을 반환하는 대신 Vue.js 페이지로 리디렉션합니다.
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Location", "/reset/password?token=" + token);
+        return new ResponseEntity<>(headers, HttpStatus.FOUND);
+    }
+
+    // 비밀번호 재설정
+    @PostMapping("/reset/password")
+    public ResponseEntity<?> resetPassword(@RequestBody PasswordResetDto dto) {
+        try {
+            memberService.resetPassword(dto);
+            return ResponseEntity.ok(new CommonResDto(HttpStatus.OK, "비밀번호 재설정에 성공하였습니다.", null));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new CommonResDto(HttpStatus.BAD_REQUEST, "비밀번호 재설정에 실패했습니다: " + e.getMessage(), null));
+        }
+    }
+    // 신고 카운트 증가
+    @PostMapping("/report/count/{memberEmail}")
+    public int reportCountUp(@PathVariable String memberEmail) {
+        log.info(memberEmail);
+        return memberService.reportCountUp(memberEmail);
+    }
+
+    @PostMapping("/member/test")
+    public void updateNoShowCount(){
+        memberService.updateNoShowCount();
     }
 
 }
