@@ -56,3 +56,6 @@
 
 ## 화면 설계서
 [화면설계서 Figma](https://www.figma.com/design/LygEmOzP9B5OG2LeJaovWu/%ED%8C%8C%EB%8B%A5-%ED%86%A0%EB%8B%A5?m=auto&t=D2AX8VoOhmvfXPpt-1)
+
+## API 단위테스트
+[API 단위테스트](https://documenter.getpostman.com/view/38355837/2sAXxMgDu1)
